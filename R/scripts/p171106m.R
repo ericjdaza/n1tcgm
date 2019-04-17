@@ -249,23 +249,27 @@ tbl_wac <- dplyr::as_tibble(df_cgm_wac) %>%
 tbl_wac$period <- NA
 for (i in 1:(nrow(tbl_wac))) {
   
-  if (tbl_wac$treatment == "pre") tbl_wac$period <- 0
-  if (tbl_wac$monthday %in% c("08-02", "08-03", "08-04")) tbl_wac$period <- 1
-  if (tbl_wac$monthday %in% c("08-05", "08-06", "08-07")) tbl_wac$period <- 2
-  if (tbl_wac$monthday %in% c("08-08", "08-09", "08-10")) tbl_wac$period <- 3
-  if (tbl_wac$monthday %in% c("08-11", "08-12", "08-13")) tbl_wac$period <- 4
-  if (tbl_wac$monthday %in% c("08-14", "08-15", "08-16")) tbl_wac$period <- 5
-  if (tbl_wac$monthday %in% c("08-17", "08-18", "08-19")) tbl_wac$period <- 6
-  if (tbl_wac$monthday %in% c("08-20", "08-21", "08-22")) tbl_wac$period <- 7
-  if (tbl_wac$monthday %in% c("08-23", "08-24", "08-25")) tbl_wac$period <- 8
-  if (tbl_wac$treatment == "post") tbl_wac$period <- 999
+  if (tbl_wac$treatment[i] == "pre") tbl_wac$period[i] <- 0
+  if (tbl_wac$monthday[i] %in% c("08-02", "08-03", "08-04")) tbl_wac$period[i] <- 1
+  if (tbl_wac$monthday[i] %in% c("08-05", "08-06", "08-07")) tbl_wac$period[i] <- 2
+  if (tbl_wac$monthday[i] %in% c("08-08", "08-09", "08-10")) tbl_wac$period[i] <- 3
+  if (tbl_wac$monthday[i] %in% c("08-11", "08-12", "08-13")) tbl_wac$period[i] <- 4
+  if (tbl_wac$monthday[i] %in% c("08-14", "08-15", "08-16")) tbl_wac$period[i] <- 5
+  if (tbl_wac$monthday[i] %in% c("08-17", "08-18", "08-19")) tbl_wac$period[i] <- 6
+  if (tbl_wac$monthday[i] %in% c("08-20", "08-21", "08-22")) tbl_wac$period[i] <- 7
+  if (tbl_wac$monthday[i] %in% c("08-23", "08-24", "08-25")) tbl_wac$period[i] <- 8
+  if (tbl_wac$treatment[i] == "post") tbl_wac$period[i] <- 999
   
 }
 rm(i)
 tbl_wac <- tbl_wac %>%
   dplyr::group_by(period) %>%
-  dplyr::mutate(timepoint_index = row_number()) %>%
-  dplyr::filter(timepoint_index == 1) %>%
+  dplyr::arrange(
+    period,
+    datetime
+  ) %>%
+  dplyr::mutate(period_timept_index = row_number()) %>%
+  dplyr::filter(period_timept_index == 1) %>%
   dplyr::select(
     period,
     datetime
@@ -275,11 +279,98 @@ tbl_wac <- tbl_wac %>%
     tbl_wac,
     by = "period"
   ) %>%
-  dplyr::mutate(
-    timepoint = as.numeric(datetime - datetime_firstinperiod)
-  )
+  dplyr::left_join(
+    tbl_wac %>%
+      dplyr::distinct(
+        period,
+        monthday
+      ) %>%
+      dplyr::arrange(
+        period,
+        monthday
+      ) %>%
+      dplyr::mutate(study_day = row_number()),
+    by = c(
+      "period",
+      "monthday"
+    )
+  ) %>%
+  dplyr::left_join(
+    tbl_wac %>%
+      dplyr::distinct(
+        period,
+        monthday
+      ) %>%
+      dplyr::arrange(
+        period,
+        monthday
+      ) %>%
+      dplyr::group_by(period) %>%
+      dplyr::mutate(period_day = row_number()),
+    by = c(
+      "period",
+      "monthday"
+    )
+  ) %>%
+  dplyr::mutate(period_timept = as.numeric(datetime - datetime_firstinperiod + 1)) %>%
+  dplyr::ungroup(period) %>%
+  dplyr::mutate(timept = as.numeric(datetime - min(datetime_firstinperiod) + 1))
+
 tbl_wac_studyperiod <- tbl_wac %>%
   dplyr::filter(treatment %in% c("A", "B"))
+
+tbl_wac_studyperiod_byday <- tbl_wac_studyperiod %>%
+  dplyr::group_by(
+    period,
+    period_day
+  ) %>%
+  dplyr::mutate(
+    
+    mean_bg.level = mean(bg.level, na.rm = TRUE),
+    sd_bg.level = sd(bg.level, na.rm = TRUE),
+    n_bg.level = sum(!is.na(bg.level)),
+    
+    mean_dv_craving = mean(dv_craving, na.rm = TRUE),
+    sd_dv_craving = sd(dv_craving, na.rm = TRUE),
+    n_dv_craving = sum(!is.na(dv_craving)),
+    
+    mean_posaff_score = mean(posaff_score, na.rm = TRUE),
+    sd_posaff_score = sd(posaff_score, na.rm = TRUE),
+    n_posaff_score = sum(!is.na(posaff_score)),
+    
+    mean_negaff_score = mean(negaff_score, na.rm = TRUE),
+    sd_negaff_score = sd(negaff_score, na.rm = TRUE),
+    n_negaff_score = sum(!is.na(negaff_score))
+    
+  ) %>%
+  dplyr::distinct(
+    
+    period,
+    period_day,
+    study_day,
+    treatment,
+    
+    mean_bg.level,
+    sd_bg.level,
+    n_bg.level,
+    
+    mean_dv_craving,
+    sd_dv_craving,
+    n_dv_craving,
+    
+    mean_posaff_score,
+    sd_posaff_score,
+    n_posaff_score,
+    
+    mean_negaff_score,
+    sd_negaff_score,
+    n_negaff_score
+    
+  ) %>%
+  dplyr::ungroup(
+    period,
+    period_day
+  )
 
 
 ## Participant: Eric J. Daza.
@@ -349,6 +440,31 @@ tbl_wac_studyperiod <- tbl_wac %>%
 
 
 
+##### Dataset and variables to use.
+tbl_touse <- tbl_wac_studyperiod %>%
+  dplyr::rename(
+    timeidx_touse = timept,
+    timeidx1_touse = period_timept,
+    bg_touse = bg.level,
+    craving_touse = dv_craving,
+    posaff_touse = posaff_score,
+    negaff_touse = negaff_score
+  )
+# tbl_touse <- tbl_wac_studyperiod_byday %>%
+#   dplyr::rename(
+#     timeidx_touse = study_day,
+#     timeidx1_touse = period_day,
+#     bg_touse = mean_bg.level,
+#     craving_touse = mean_dv_craving,
+#     posaff_touse = mean_posaff_score,
+#     negaff_touse = mean_negaff_score
+#   )
+
+
+
+
+
+
 ##### Tables.
 
 ## BGL: We have enough data to model and test with CAPTEuR.
@@ -359,23 +475,23 @@ tbl_wac_studyperiod <- tbl_wac %>%
 
 ##### Figures.
 xlim_touse <- c(
-  min(tbl_wac_studyperiod$timepoint),
-  max(tbl_wac_studyperiod$timepoint)
+  min(tbl_touse$timeidx_touse),
+  max(tbl_touse$timeidx_touse)
 )
 
 
 ## Blood glucose level.
 ylim_touse <- c(
-  min(log(tbl_wac_studyperiod$bg.level), na.rm = TRUE),
-  max(log(tbl_wac_studyperiod$bg.level), na.rm = TRUE)
+  min(log(tbl_touse$bg_touse), na.rm = TRUE),
+  max(log(tbl_touse$bg_touse), na.rm = TRUE)
 )
-tbl_wac_forplot <- tbl_wac_studyperiod %>%
+tbl_touse_forplot <- tbl_touse %>%
   dplyr::mutate(
-    dv_craving_scaled = ifelse(
-      dv_craving == 1,
+    craving_touse_scaled = ifelse(
+      craving_touse == 1,
       ylim_touse[1],
       ifelse(
-        dv_craving == 2,
+        craving_touse == 2,
         ylim_touse[2],
         NA
       )
@@ -383,10 +499,10 @@ tbl_wac_forplot <- tbl_wac_studyperiod %>%
   )
 set.seed(scalar.seed)
 ggp_bglevel <- ggplot2::ggplot(
-  data = tbl_wac_forplot,
+  data = tbl_touse_forplot,
   aes(
-    x = timepoint,
-    y = log(bg.level)
+    x = timeidx_touse,
+    y = log(bg_touse)
   )
 ) +
   ggplot2::theme_classic() +
@@ -399,25 +515,32 @@ ggp_bglevel <- ggplot2::ggplot(
   ) +
   ggplot2::geom_point(
     aes(
-      x = timepoint,
-      y = dv_craving_scaled,
+      x = timeidx_touse,
+      y = craving_touse_scaled,
       # group = period,
       color = treatment
     ),
     size = 5,
     alpha = global_alpha
   ) +
-  ggplot2::xlim(xlim_touse)
+  ggplot2::xlim(xlim_touse) +
+  ggplot2::geom_vline(
+    xintercept = (
+      tbl_touse %>%
+        dplyr::filter(timeidx1_touse == 1) %>%
+        dplyr::select(timeidx_touse)
+    )$timeidx_touse
+  )
 ggp_bglevel
 
 
 ## Craving.
 set.seed(scalar.seed)
 ggp_jitter <- ggplot2::ggplot(
-  data = tbl_wac_forplot,
+  data = tbl_touse_forplot,
   aes(
     x = treatment,
-    y = dv_craving_scaled
+    y = craving_touse_scaled
   )
 ) +
   ggplot2::theme_classic() +
@@ -433,13 +556,13 @@ ggp_jitter
 
 ## PANAS.
 ylim_touse <- c(0, 50)
-tbl_wac_forplot_panas <- tbl_wac_studyperiod %>%
+tbl_touse_forplot_panas <- tbl_touse %>%
   dplyr::mutate(
-    dv_craving_scaled = ifelse(
-      dv_craving == 1,
+    craving_touse_scaled = ifelse(
+      craving_touse == 1,
       ylim_touse[1],
       ifelse(
-        dv_craving == 2,
+        craving_touse == 2,
         ylim_touse[2],
         NA
       )
@@ -447,10 +570,10 @@ tbl_wac_forplot_panas <- tbl_wac_studyperiod %>%
   )
 set.seed(scalar.seed)
 ggp_panas <- ggplot2::ggplot(
-  data = tbl_wac_forplot_panas,
+  data = tbl_touse_forplot_panas,
   aes(
-    x = timepoint,
-    y = posaff_score
+    x = timeidx_touse,
+    y = posaff_touse
   )
 ) +
   ggplot2::theme_classic() +
@@ -459,28 +582,37 @@ ggp_panas <- ggplot2::ggplot(
       group = period,
       color = treatment
     ),
-    size = 3,
-    alpha = global_alpha
-  ) +
-  ggplot2::geom_point(
-    aes(
-      y = negaff_score,
-      group = period,
-      color = treatment
-    ),
-    alpha = global_alpha
-  ) +
-  ggplot2::geom_point(
-    aes(
-      x = timepoint,
-      y = dv_craving_scaled,
-      # group = period,
-      color = treatment
-    ),
     size = 5,
     alpha = global_alpha
   ) +
-  ggplot2::xlim(xlim_touse)
+  ggplot2::geom_point(
+    aes(
+      y = negaff_touse,
+      group = period,
+      color = treatment
+    ),
+    shape = 21,
+    size = 5,
+    alpha = global_alpha
+  ) +
+  # ggplot2::geom_point(
+  #   aes(
+  #     x = timeidx_touse,
+  #     y = craving_touse_scaled,
+  #     # group = period,
+  #     color = treatment
+  #   ),
+  #   size = 5,
+  #   alpha = global_alpha
+  # ) +
+  ggplot2::xlim(xlim_touse) +
+  ggplot2::geom_vline(
+    xintercept = (
+      tbl_touse %>%
+        dplyr::filter(timeidx1_touse == 1) %>%
+        dplyr::select(timeidx_touse)
+    )$timeidx_touse
+  )
 ggp_panas
 
 
