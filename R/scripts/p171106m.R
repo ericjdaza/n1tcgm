@@ -262,7 +262,12 @@ for (i in 1:(nrow(tbl_wac))) {
   
 }
 rm(i)
-tbl_wac <- tbl_wac %>%
+
+tbl_wac_studyperiod <- tbl_wac %>%
+  dplyr::filter(treatment %in% c("A", "B"))
+
+tbl_wac_studyperiod <- 
+  tbl_wac_studyperiod %>%
   dplyr::group_by(period) %>%
   dplyr::arrange(
     period,
@@ -275,12 +280,14 @@ tbl_wac <- tbl_wac %>%
     datetime
   ) %>%
   dplyr::rename(datetime_firstinperiod = datetime) %>%
+  
   dplyr::right_join(
-    tbl_wac,
+    tbl_wac_studyperiod,
     by = "period"
   ) %>%
+  
   dplyr::left_join(
-    tbl_wac %>%
+    tbl_wac_studyperiod %>%
       dplyr::distinct(
         period,
         monthday
@@ -295,8 +302,9 @@ tbl_wac <- tbl_wac %>%
       "monthday"
     )
   ) %>%
+  
   dplyr::left_join(
-    tbl_wac %>%
+    tbl_wac_studyperiod %>%
       dplyr::distinct(
         period,
         monthday
@@ -314,10 +322,10 @@ tbl_wac <- tbl_wac %>%
   ) %>%
   dplyr::mutate(period_timept = as.numeric(datetime - datetime_firstinperiod + 1)) %>%
   dplyr::ungroup(period) %>%
-  dplyr::mutate(timept = as.numeric(datetime - min(datetime_firstinperiod) + 1))
-
-tbl_wac_studyperiod <- tbl_wac %>%
-  dplyr::filter(treatment %in% c("A", "B"))
+  dplyr::mutate(
+    timept = as.numeric(datetime - min(datetime_firstinperiod) + 1),
+    log_bg.level = log(bg.level)
+  )
 
 tbl_wac_studyperiod_byday <- tbl_wac_studyperiod %>%
   dplyr::group_by(
@@ -329,6 +337,10 @@ tbl_wac_studyperiod_byday <- tbl_wac_studyperiod %>%
     mean_bg.level = mean(bg.level, na.rm = TRUE),
     sd_bg.level = sd(bg.level, na.rm = TRUE),
     n_bg.level = sum(!is.na(bg.level)),
+    
+    mean_log_bg.level = mean(log_bg.level, na.rm = TRUE),
+    sd_log_bg.level = sd(log_bg.level, na.rm = TRUE),
+    n_log_bg.level = sum(!is.na(log_bg.level)),
     
     mean_dv_craving = mean(dv_craving, na.rm = TRUE),
     sd_dv_craving = sd(dv_craving, na.rm = TRUE),
@@ -353,6 +365,10 @@ tbl_wac_studyperiod_byday <- tbl_wac_studyperiod %>%
     mean_bg.level,
     sd_bg.level,
     n_bg.level,
+    
+    mean_log_bg.level,
+    sd_log_bg.level,
+    n_log_bg.level,
     
     mean_dv_craving,
     sd_dv_craving,
@@ -444,8 +460,9 @@ tbl_wac_studyperiod_byday <- tbl_wac_studyperiod %>%
 tbl_touse <- tbl_wac_studyperiod %>%
   dplyr::rename(
     timeidx_touse = timept,
-    timeidx1_touse = period_timept,
+    spaghetti_timeidx_touse = period_timept,
     bg_touse = bg.level,
+    # bg_touse = log_bg.level,
     craving_touse = dv_craving,
     posaff_touse = posaff_score,
     negaff_touse = negaff_score
@@ -453,8 +470,9 @@ tbl_touse <- tbl_wac_studyperiod %>%
 # tbl_touse <- tbl_wac_studyperiod_byday %>%
 #   dplyr::rename(
 #     timeidx_touse = study_day,
-#     timeidx1_touse = period_day,
-#     bg_touse = mean_bg.level,
+#     spaghetti_timeidx_touse = period_day,
+#     # bg_touse = mean_bg.level,
+#     bg_touse = mean_log_bg.level,
 #     craving_touse = mean_dv_craving,
 #     posaff_touse = mean_posaff_score,
 #     negaff_touse = mean_negaff_score
@@ -480,29 +498,112 @@ xlim_touse <- c(
 )
 
 
-## Blood glucose level.
-ylim_touse <- c(
-  min(log(tbl_touse$bg_touse), na.rm = TRUE),
-  max(log(tbl_touse$bg_touse), na.rm = TRUE)
-)
-tbl_touse_forplot <- tbl_touse %>%
+## Hypothesis 1: Blood glucose level.
+
+# Spaghetti plot.
+binsize_pctofspag <- 0.01
+tbl_touse_spaghetti <- tbl_touse %>%
+  dplyr::filter(period_day == 1) %>%
+  dplyr::select(
+    period,
+    spaghetti_timeidx_touse,
+    treatment,
+    bg_touse
+  ) %>%
   dplyr::mutate(
-    craving_touse_scaled = ifelse(
-      craving_touse == 1,
-      ylim_touse[1],
+    spaghetti_interval = ceiling(
+      spaghetti_timeidx_touse /
+        ceiling( ( max(spaghetti_timeidx_touse) - min(spaghetti_timeidx_touse) ) * binsize_pctofspag )
+    ),
+    linetype_touse = ifelse(
+      treatment == "A",
+      "solid",
       ifelse(
-        craving_touse == 2,
-        ylim_touse[2],
+        treatment == "B",
+        "dotted",
         NA
       )
     )
   )
-set.seed(scalar.seed)
-ggp_bglevel <- ggplot2::ggplot(
-  data = tbl_touse_forplot,
+tbl_touse_spaghetti <- tbl_touse_spaghetti %>%
+  dplyr::left_join(
+    tbl_touse_spaghetti %>%
+      dplyr::select(
+        treatment,
+        spaghetti_interval,
+        bg_touse
+      ) %>%
+      dplyr::group_by(
+        treatment,
+        spaghetti_interval
+      ) %>%
+      dplyr::mutate(
+        mean_bg_touse = mean(bg_touse, na.rm = TRUE),
+        median_bg_touse = median(bg_touse, na.rm = TRUE),
+        sd_bg_touse = sd(bg_touse, na.rm = TRUE),
+        IQR_bg_touse = IQR(bg_touse, na.rm = TRUE)
+      ) %>%
+      dplyr::ungroup(
+        treatment,
+        spaghetti_interval
+      ) %>%
+      dplyr::distinct(
+        treatment,
+        spaghetti_interval,
+        mean_bg_touse,
+        median_bg_touse,
+        sd_bg_touse,
+        IQR_bg_touse
+      ),
+    by = c(
+      "treatment",
+      "spaghetti_interval"
+    )
+  )
+tbl_touse_spaghetti <- tbl_touse_spaghetti %>%
+  dplyr::filter(treatment == "A") %>%
+  dplyr::distinct(
+    spaghetti_interval,
+    mean_bg_touse,
+    median_bg_touse,
+    sd_bg_touse,
+    IQR_bg_touse
+  ) %>%
+  dplyr::inner_join(
+    tbl_touse_spaghetti %>%
+      dplyr::filter(treatment == "B") %>%
+      dplyr::distinct(
+        spaghetti_interval,
+        mean_bg_touse,
+        median_bg_touse,
+        sd_bg_touse,
+        IQR_bg_touse
+      ),
+    by = "spaghetti_interval"
+  ) %>%
+  dplyr::mutate(
+    diff_mean_bg_touse = mean_bg_touse.x - mean_bg_touse.y,
+    diff_median_bg_touse = median_bg_touse.x - median_bg_touse.y,
+    diff_sd_bg_touse = sd_bg_touse.x - sd_bg_touse.y,
+    diff_IQR_bg_touse = IQR_bg_touse.x - IQR_bg_touse.y
+  ) %>%
+  dplyr::select(
+    spaghetti_interval,
+    diff_mean_bg_touse,
+    diff_median_bg_touse,
+    diff_sd_bg_touse,
+    diff_IQR_bg_touse
+  ) %>%
+  dplyr::right_join(
+    tbl_touse_spaghetti,
+    by = "spaghetti_interval"
+  )
+
+ggp_bglevel_spaghetti <- ggplot2::ggplot(
+  data = tbl_touse_spaghetti,
   aes(
-    x = timeidx_touse,
-    y = log(bg_touse)
+    x = spaghetti_timeidx_touse,
+    y = bg_touse
   )
 ) +
   ggplot2::theme_classic() +
@@ -510,136 +611,218 @@ ggp_bglevel <- ggplot2::ggplot(
     aes(
       group = period,
       color = treatment
-    ),
-    alpha = global_alpha
-  ) +
-  ggplot2::geom_point(
-    aes(
-      x = timeidx_touse,
-      y = craving_touse_scaled,
-      # group = period,
-      color = treatment
-    ),
-    size = 5,
-    alpha = global_alpha
-  ) +
-  ggplot2::xlim(xlim_touse) +
-  ggplot2::geom_vline(
-    xintercept = (
-      tbl_touse %>%
-        dplyr::filter(timeidx1_touse == 1) %>%
-        dplyr::select(timeidx_touse)
-    )$timeidx_touse
-  )
-ggp_bglevel
-
-
-## Craving.
-set.seed(scalar.seed)
-ggp_jitter <- ggplot2::ggplot(
-  data = tbl_touse_forplot,
-  aes(
-    x = treatment,
-    y = craving_touse_scaled
-  )
-) +
-  ggplot2::theme_classic() +
-  ggplot2::geom_jitter(
-    aes(color = treatment),
-    width = 0.22,
-    height = 0.22,
-    size = 5,
-    alpha = global_alpha
-  )
-ggp_jitter
-
-
-## PANAS.
-ylim_touse <- c(0, 50)
-tbl_touse_forplot_panas <- tbl_touse %>%
-  dplyr::mutate(
-    craving_touse_scaled = ifelse(
-      craving_touse == 1,
-      ylim_touse[1],
-      ifelse(
-        craving_touse == 2,
-        ylim_touse[2],
-        NA
-      )
+      # , linetype = treatment
+      # , linetype = linetype_touse
     )
-  )
-set.seed(scalar.seed)
-ggp_panas <- ggplot2::ggplot(
-  data = tbl_touse_forplot_panas,
-  aes(
-    x = timeidx_touse,
-    y = posaff_touse
-  )
-) +
-  ggplot2::theme_classic() +
-  ggplot2::geom_point(
-    aes(
-      group = period,
-      color = treatment
-    ),
-    size = 5,
-    alpha = global_alpha
+    , alpha = global_alpha
   ) +
-  ggplot2::geom_point(
+  ggplot2::geom_line(
     aes(
-      y = negaff_touse,
-      group = period,
+      # y = mean_bg_touse,
+      y = median_bg_touse,
+      group = treatment,
       color = treatment
+      # , linetype = treatment
+      # , linetype = linetype_touse
     ),
-    shape = 21,
-    size = 5,
-    alpha = global_alpha
+    size = 1.5
   ) +
-  # ggplot2::geom_point(
-  #   aes(
-  #     x = timeidx_touse,
-  #     y = craving_touse_scaled,
-  #     # group = period,
-  #     color = treatment
-  #   ),
-  #   size = 5,
-  #   alpha = global_alpha
+  ggplot2::geom_line(
+    aes(
+      # y = sd_bg_touse,
+      y = IQR_bg_touse,
+      group = treatment,
+      color = treatment
+      # , linetype = treatment
+      # , linetype = linetype_touse
+    ),
+    # linetype = "dotted",
+    size = 0.2
+  ) +
+  ggplot2::geom_line(
+    data = tbl_touse_spaghetti %>%
+      dplyr::filter(treatment == "A"), # use this for all diff_ variables
+    aes(
+      # y = diff_mean_bg_touse,
+      y = diff_median_bg_touse
+    ),
+    size = 1
+  ) +
+  ggplot2::geom_line(
+    data = tbl_touse_spaghetti %>%
+      dplyr::filter(treatment == "A"), # use this for all diff_ variables
+    aes(
+      # y = diff_sd_bg_touse,
+      y = diff_IQR_bg_touse
+    ),
+    # linetype = "dotted",
+    size = 0.2
+  ) +
+  ggplot2::geom_hline(yintercept = 0)
   # ) +
-  ggplot2::xlim(xlim_touse) +
-  ggplot2::geom_vline(
-    xintercept = (
-      tbl_touse %>%
-        dplyr::filter(timeidx1_touse == 1) %>%
-        dplyr::select(timeidx_touse)
-    )$timeidx_touse
-  )
-ggp_panas
+  # scale_color_manual(values = c("A" = "black", "B" = "gray"))
+ggp_bglevel_spaghetti
 
-
-
-
-
-
-
-# ====================================================================== #
-# ====================================================================== #
-# ===== Miscellaneous (e.g., code, help files/websites, examples). ===== #
-# ====================================================================== #
-# ====================================================================== #
-
-
-
-# ### Date conversion from MSExcel: https://www.r-bloggers.com/date-formats-in-r/
+# # Time series.
+# ylim_touse <- c(
+#   min(log(tbl_touse$bg_touse), na.rm = TRUE),
+#   max(log(tbl_touse$bg_touse), na.rm = TRUE)
+# )
+# tbl_touse_forplot <- tbl_touse %>%
+#   dplyr::mutate(
+#     craving_touse_scaled = ifelse(
+#       craving_touse == 1,
+#       ylim_touse[1],
+#       ifelse(
+#         craving_touse == 2,
+#         ylim_touse[2],
+#         NA
+#       )
+#     )
+#   )
+# set.seed(scalar.seed)
+# ggp_bglevel <- ggplot2::ggplot(
+#   data = tbl_touse_forplot,
+#   aes(
+#     x = timeidx_touse,
+#     y = bg_touse
+#   )
+# ) +
+#   ggplot2::theme_classic() +
+#   ggplot2::geom_line(
+#     aes(
+#       group = period,
+#       color = treatment
+#     ),
+#     alpha = global_alpha
+#   ) +
+#   ggplot2::geom_point(
+#     aes(
+#       x = timeidx_touse,
+#       y = craving_touse_scaled,
+#       # group = period,
+#       color = treatment
+#     ),
+#     size = 5,
+#     alpha = global_alpha
+#   ) +
+#   ggplot2::xlim(xlim_touse) +
+#   ggplot2::geom_vline(
+#     xintercept = (
+#       tbl_touse %>%
+#         dplyr::filter(spaghetti_timeidx_touse == 1) %>%
+#         dplyr::select(timeidx_touse)
+#     )$timeidx_touse
+#   )
+# ggp_bglevel
 # 
-# # from Windows Excel:
-# dates <- c(30829, 38540)
-# betterDates <- as.Date(dates,
-#                        origin = "1899-12-30")
 # 
-# >   betterDates
-# [1] "1984-05-27" "2005-07-07"
+# ## Craving.
+# set.seed(scalar.seed)
+# ggp_jitter <- ggplot2::ggplot(
+#   data = tbl_touse_forplot,
+#   aes(
+#     x = treatment,
+#     y = craving_touse_scaled
+#   )
+# ) +
+#   ggplot2::theme_classic() +
+#   ggplot2::geom_jitter(
+#     aes(color = treatment),
+#     width = 0.22,
+#     height = 0.22,
+#     size = 5,
+#     alpha = global_alpha
+#   )
+# ggp_jitter
 # 
-# # from Mac Excel:
-# dates <- c(29367, 37078)
-# betterDates <- as.Date(dates,
-#                        origin = "1904-01-01")
+# 
+# ## PANAS.
+# ylim_touse <- c(0, 50)
+# tbl_touse_forplot_panas <- tbl_touse %>%
+#   dplyr::mutate(
+#     craving_touse_scaled = ifelse(
+#       craving_touse == 1,
+#       ylim_touse[1],
+#       ifelse(
+#         craving_touse == 2,
+#         ylim_touse[2],
+#         NA
+#       )
+#     )
+#   )
+# set.seed(scalar.seed)
+# ggp_panas <- ggplot2::ggplot(
+#   data = tbl_touse_forplot_panas,
+#   aes(
+#     x = timeidx_touse,
+#     y = posaff_touse
+#   )
+# ) +
+#   ggplot2::theme_classic() +
+#   ggplot2::geom_point(
+#     aes(
+#       group = period,
+#       color = treatment
+#     ),
+#     size = 5,
+#     alpha = global_alpha
+#   ) +
+#   ggplot2::geom_point(
+#     aes(
+#       y = negaff_touse,
+#       group = period,
+#       color = treatment
+#     ),
+#     shape = 21,
+#     size = 5,
+#     alpha = global_alpha
+#   ) +
+#   # ggplot2::geom_point(
+#   #   aes(
+#   #     x = timeidx_touse,
+#   #     y = craving_touse_scaled,
+#   #     # group = period,
+#   #     color = treatment
+#   #   ),
+#   #   size = 5,
+#   #   alpha = global_alpha
+#   # ) +
+#   ggplot2::xlim(xlim_touse) +
+#   ggplot2::geom_vline(
+#     xintercept = (
+#       tbl_touse %>%
+#         dplyr::filter(spaghetti_timeidx_touse == 1) %>%
+#         dplyr::select(timeidx_touse)
+#     )$timeidx_touse
+#   )
+# ggp_panas
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# # ====================================================================== #
+# # ====================================================================== #
+# # ===== Miscellaneous (e.g., code, help files/websites, examples). ===== #
+# # ====================================================================== #
+# # ====================================================================== #
+# 
+# 
+# 
+# # ### Date conversion from MSExcel: https://www.r-bloggers.com/date-formats-in-r/
+# # 
+# # # from Windows Excel:
+# # dates <- c(30829, 38540)
+# # betterDates <- as.Date(dates,
+# #                        origin = "1899-12-30")
+# # 
+# # >   betterDates
+# # [1] "1984-05-27" "2005-07-07"
+# # 
+# # # from Mac Excel:
+# # dates <- c(29367, 37078)
+# # betterDates <- as.Date(dates,
+# #                        origin = "1904-01-01")
