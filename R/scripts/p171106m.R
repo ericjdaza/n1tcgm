@@ -499,6 +499,9 @@ xlim_touse <- c(
 
 
 ## Hypothesis 1: Blood glucose level.
+# Hypothesis 1 was that sleep deprivation (“sleep-dep”) renders blood sugar control less effective the next day. Specifically, we expected to observe elevated glucose levels for longer intervals of time on average on post-sleep-dep days (i.e., days that each follow a night of sleep-dep) compared with control days (i.e., days that each follow a night of baseline sleep without sleep-dep).
+# Hypothesis 2 was that sleep-dep physiologically induces higher craving for quick carbohydrates the next day because of the stress response. Specifically, we expected to observe more cravings for quick-energy foods on average on post-sleep-dep days compared with control days.
+# Hypothesis 3 was that sleep-dep worsens mood the next day. Specifically, we expected to observe more reports of negative mood on average on post-sleep-dep days compared with control days.
 
 # Spaghetti plot.
 binsize_pctofspag <- 0.01
