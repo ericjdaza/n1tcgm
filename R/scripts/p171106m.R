@@ -51,6 +51,7 @@ library(readr)
 
 ### Set parameters.
 global_alpha <- 0.6
+global_alpha_panas <- 0.8
 xaxis_time_unit_in_seconds <- 3600 # hour
 # xaxis_time_unit_in_seconds <- 60 # second
 
@@ -482,26 +483,36 @@ tbl_wac_studyperiod_byday <- tbl_wac_studyperiod %>%
 
 ##### Set plot parameters.
 
-# what_to_plot <- "figures"
-what_to_plot <- "tables"
+what_to_plot <- "figures"
+# what_to_plot <- "tables"
 # what_to_plot <- "both"
 
-num_blockdays_to_output <- 1
-# num_blockdays_to_output <- 3
+# num_blockdays_to_output <- 1
+num_blockdays_to_output <- 3
 
-values_to_plot <- "original"
+# values_to_plot <- "original"
 # values_to_plot <- "differences"
-# values_to_plot <- "both"
+values_to_plot <- "both"
 
-height_touse <- 5
-width_touse <- 7
-filename_touse_bg <- "fig_bg_original_values_"
-# filename_touse_bg <- "fig_bg_differences_in_values_"
-# filename_touse_bg <- "fig_bg_orig_and_diffin_values_"
+# pdfpng <- "pdf"
+# height_touse <- 5
+# width_touse <- 7
+pdfpng <- "png"
+height_touse <- 480 * 3
+width_touse <- 640 * 3
+
+png_size_multiplier <- 3
+size_default <- 1
+if (pdfpng == "png") size_default <- png_size_multiplier * size_default
+
+if (values_to_plot == "original") filename_touse_bg <- "fig_bg_original_values_"
+if (values_to_plot == "differences") filename_touse_bg <- "fig_bg_differences_in_values_"
+if (values_to_plot == "both") filename_touse_bg <- "fig_bg_orig_and_diffin_values_"
 filename_touse_bg <- paste0(
   filename_touse_bg,
   num_blockdays_to_output,
-  "days.pdf"
+  "days.",
+  pdfpng
 )
 
 filename_touse_craving <- paste0(
@@ -513,7 +524,8 @@ filename_touse_craving <- paste0(
 filename_touse_panas <- paste0(
   "fig_panas_values_",
   num_blockdays_to_output,
-  "days.pdf"
+  "days.",
+  pdfpng
 )
 
 # bg_num_of_partitions <- 100
@@ -708,6 +720,7 @@ if (what_to_plot %in% c("figures", "both")) {
           # , linetype = treatment
           # , linetype = linetype_touse
         )
+        , size = size_default
         , alpha = global_alpha
       ) +
       ggplot2::geom_line(
@@ -719,7 +732,7 @@ if (what_to_plot %in% c("figures", "both")) {
           # , linetype = treatment
           # , linetype = linetype_touse
         ),
-        size = 1.5
+        size = size_default * 1.5
       ) +
       ggplot2::geom_line(
         aes(
@@ -731,7 +744,7 @@ if (what_to_plot %in% c("figures", "both")) {
           # , linetype = linetype_touse
         ),
         # linetype = "dotted",
-        size = 0.2
+        size = size_default * 0.2
       ) +
       ggplot2::ylim(ylim_touse) +
       ggplot2::ylab(label = "Blood Glucose") # bg_touse = bg.level
@@ -748,7 +761,7 @@ if (what_to_plot %in% c("figures", "both")) {
       y = diff_median_bg_touse
     )
   ) +
-    ggplot2::geom_line() +
+    ggplot2::geom_line(size = size_default) +
     ggplot2::geom_line(
       data = tbl_touse_spaghetti %>%
         dplyr::filter(treatment == "A"), # use this for all diff_ variables
@@ -757,7 +770,7 @@ if (what_to_plot %in% c("figures", "both")) {
         y = diff_IQR_bg_touse
       ),
       # linetype = "dotted",
-      size = 0.2
+      size = size_default * 0.2
     ) +
     ggplot2::ylab(label = "Difference in Blood Glucose (A-B)") # bg_touse = bg.level
   # ggplot2::ylab(label = "Difference in Logged Blood Glucose (A-B)") # bg_touse = log_bg.level
@@ -776,6 +789,7 @@ if (what_to_plot %in% c("figures", "both")) {
         # , linetype = treatment
         # , linetype = linetype_touse
       )
+      , size = size_default
       , alpha = global_alpha
     ) +
     ggplot2::geom_line(
@@ -787,7 +801,7 @@ if (what_to_plot %in% c("figures", "both")) {
         # , linetype = treatment
         # , linetype = linetype_touse
       ),
-      size = 1.5
+      size = size_default * 1.5
     ) +
     ggplot2::geom_line(
       aes(
@@ -799,7 +813,7 @@ if (what_to_plot %in% c("figures", "both")) {
         # , linetype = linetype_touse
       ),
       # linetype = "dotted",
-      size = 0.2
+      size = size_default * 0.2
     ) +
     ggplot2::geom_line(
       data = tbl_touse_spaghetti %>%
@@ -808,7 +822,7 @@ if (what_to_plot %in% c("figures", "both")) {
         # y = diff_mean_bg_touse,
         y = diff_median_bg_touse
       ),
-      size = 1
+      size = size_default
     ) +
     ggplot2::geom_line(
       data = tbl_touse_spaghetti %>%
@@ -818,7 +832,7 @@ if (what_to_plot %in% c("figures", "both")) {
         y = diff_IQR_bg_touse
       ),
       # linetype = "dotted",
-      size = 0.2
+      size = size_default * 0.2
     ) +
     ggplot2::ylab(label = "Blood Glucose (or Difference)") # bg_touse = bg.level
   # ggplot2::ylab(label = "Logged Blood Glucose (or Difference)") # bg_touse = log_bg.level
@@ -828,7 +842,7 @@ if (what_to_plot %in% c("figures", "both")) {
     ggplot2::geom_hline(
       yintercept = 0,
       color = "gray",
-      size = 0.4
+      size = size_default * 0.4
     ) +
     scale_color_discrete(name = "Treatment") # http://www.cookbook-r.com/Graphs/Legends_(ggplot2)/
   
@@ -869,20 +883,30 @@ if (what_to_plot %in% c("figures", "both")) {
       # )$timeidx_touse,
       xintercept = c(0, seq(from = 24, to = (24 * num_blockdays_to_output), by = 24)),
       color = "gray",
-      size = 0.6
+      size = size_default * 0.6
     )
   
-  # Export.
-  pdf(
-    file = paste0(path_data_output, filename_touse_bg)
-    , height = height_touse
-    , width = width_touse
-    , onefile = TRUE
-  )
-  ggp_bglevel_spaghetti
-  dev.off()
+  ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
+    ggplot2::theme_classic()
+  if (pdfpng == "png") ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
+    ggplot2::theme_classic(base_size = png_size_multiplier * 11) # default is 11; https://stackoverflow.com/questions/11955229/how-to-change-the-default-font-size-in-ggplot2
   
 }
+
+# Export.
+# pdf(
+#   file = paste0(path_data_output, filename_touse_bg)
+#   , height = height_touse
+#   , width = width_touse
+#   , onefile = TRUE
+# )
+png(
+  file = paste0(path_data_output, filename_touse_bg)
+  , height = height_touse
+  , width = width_touse
+)
+ggp_bglevel_spaghetti
+dev.off()
 
 
 
@@ -980,16 +1004,16 @@ if (what_to_plot %in% c("figures", "both")) {
         group = period,
         color = treatment
       )
-      # , size = 2
-      , alpha = global_alpha
+      , size = size_default
+      , alpha = global_alpha_panas
     ) +
     ggplot2::geom_point(
       aes(
         group = period,
         color = treatment
       )
-      # , size = 2
-      , alpha = global_alpha
+      , size = size_default * 4
+      , alpha = global_alpha_panas
     ) +
     ggplot2::geom_line(
       aes(
@@ -998,8 +1022,8 @@ if (what_to_plot %in% c("figures", "both")) {
         color = treatment
       )
       , linetype = "dotted"
-      , size = 1.5
-      , alpha = global_alpha
+      , size = size_default * 1.5
+      , alpha = global_alpha_panas
     ) +
     ggplot2::geom_point(
       aes(
@@ -1008,8 +1032,8 @@ if (what_to_plot %in% c("figures", "both")) {
         color = treatment
       )
       , shape = 21
-      , size = 4
-      , alpha = global_alpha
+      , size = size_default * 4
+      , alpha = global_alpha_panas
     ) +
     ggplot2::ylim(ylim_touse) +
     scale_color_discrete(name = "Treatment") + # http://www.cookbook-r.com/Graphs/Legends_(ggplot2)/
@@ -1036,20 +1060,30 @@ if (what_to_plot %in% c("figures", "both")) {
       # )$timeidx_touse,
       xintercept = c(0, seq(from = 24, to = (24 * num_blockdays_to_output), by = 24)),
       color = "gray",
-      size = 0.6
+      size = size_default * 0.6
     )
   
-  # Export.
-  pdf(
-    file = paste0(path_data_output, filename_touse_panas)
-    , height = height_touse
-    , width = width_touse
-    , onefile = TRUE
-  )
-  ggp_panas
-  dev.off()
+  ggp_panas <- ggp_panas +
+    ggplot2::theme_classic()
+  if (pdfpng == "png") ggp_panas <- ggp_panas +
+    ggplot2::theme_classic(base_size = png_size_multiplier * 11) # default is 11; https://stackoverflow.com/questions/11955229/how-to-change-the-default-font-size-in-ggplot2
   
 }
+
+# Export.
+# pdf(
+#   file = paste0(path_data_output, filename_touse_panas)
+#   , height = height_touse
+#   , width = width_touse
+#   , onefile = TRUE
+# )
+png(
+  file = paste0(path_data_output, filename_touse_panas)
+  , height = height_touse
+  , width = width_touse
+)
+ggp_panas
+dev.off()
 
 
 
