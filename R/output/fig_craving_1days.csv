@@ -1,0 +1,5 @@
+﻿period_day,treatment,craving_touse,n(),fisher_test_pvalue
+1,A (Sleep-Dep),FALSE,6,0.7880707866808286
+1,A (Sleep-Dep),TRUE,7,0.7880707866808286
+1,B (Normal Sleep),FALSE,1,0.7880707866808286
+1,B (Normal Sleep),TRUE,10,0.7880707866808286
