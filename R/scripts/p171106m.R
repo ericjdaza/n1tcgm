@@ -50,7 +50,7 @@ library(readr)
 
 
 ### Set parameters.
-global_alpha <- 0.6
+global_alpha <- 0.5
 global_alpha_panas <- 0.8
 xaxis_time_unit_in_seconds <- 3600 # hour
 # xaxis_time_unit_in_seconds <- 60 # second
@@ -243,8 +243,8 @@ tbl_wac <- dplyr::as_tibble(df_cgm_wac) %>%
               "08-17", "08-18", "08-19",
               "08-23", "08-24", "08-25"
             ),
-          "B",
-          "A"
+          "B (Normal Sleep)",
+          "A (Sleep-Dep)"
         )
       )
     )
@@ -272,7 +272,7 @@ names(tbl_wac)
 table(tbl_wac$`What.food.(specific).or.food.type.(e.g..high.salt,.high.fat,.high.sugar).do.you.feel.a.craving.for?.(If.you.just.ate,.answer.the.question.for.which.food.did.you.feel.craving.for).`)
 
 tbl_wac_studyperiod <- tbl_wac %>%
-  dplyr::filter(treatment %in% c("A", "B"))
+  dplyr::filter(treatment %in% c("A (Sleep-Dep)", "B (Normal Sleep)"))
 
 tbl_wac_studyperiod <- tbl_wac_studyperiod %>%
   dplyr::group_by(period) %>%
@@ -501,7 +501,7 @@ pdfpng <- "png"
 height_touse <- 480 * 3
 width_touse <- 640 * 3
 
-png_size_multiplier <- 3
+png_size_multiplier <- 4
 size_default <- 1
 if (pdfpng == "png") size_default <- png_size_multiplier * size_default
 
@@ -615,10 +615,10 @@ if (what_to_plot %in% c("figures", "both")) {
       # ),
       spaghetti_interval = ceiling(spaghetti_timeidx_touse),
       linetype_touse = ifelse(
-        treatment == "A",
+        treatment == "A (Sleep-Dep)",
         "solid",
         ifelse(
-          treatment == "B",
+          treatment == "B (Normal Sleep)",
           "dotted",
           NA
         )
@@ -660,7 +660,7 @@ if (what_to_plot %in% c("figures", "both")) {
       )
     )
   tbl_touse_spaghetti <- tbl_touse_spaghetti %>%
-    dplyr::filter(treatment == "A") %>%
+    dplyr::filter(treatment == "A (Sleep-Dep)") %>%
     dplyr::distinct(
       spaghetti_interval,
       mean_bg_touse,
@@ -670,7 +670,7 @@ if (what_to_plot %in% c("figures", "both")) {
     ) %>%
     dplyr::inner_join(
       tbl_touse_spaghetti %>%
-        dplyr::filter(treatment == "B") %>%
+        dplyr::filter(treatment == "B (Normal Sleep)") %>%
         dplyr::distinct(
           spaghetti_interval,
           mean_bg_touse,
@@ -699,20 +699,56 @@ if (what_to_plot %in% c("figures", "both")) {
     )
   
   # Make plot.
+  ylim_touse_bg <- c(
+    0,
+    # max(tbl_touse$bg_touse, na.rm = TRUE)
+    ceiling(
+      max(
+        (
+          tbl_touse %>%
+            dplyr::filter(period_day %in% seq(1, num_blockdays_to_output, 1))
+        )$bg_touse,
+        na.rm = TRUE
+      ) / 10
+    ) * 10
+  )
   
   if (values_to_plot == "original") {
     
-    ylim_touse <- c(
-      0,
-      max(tbl_touse$bg_touse, na.rm = TRUE)
-    )
-    ggp_bglevel_spaghetti <- ggplot2::ggplot(
+    ggp_bglevel <- ggplot2::ggplot(
       data = tbl_touse_spaghetti,
       aes(
         x = spaghetti_timeidx_touse,
         y = bg_touse
       )
-    ) +
+    )
+    
+    if (xaxis_time_unit_in_seconds == 3600) {
+      
+      ggp_bglevel <- ggp_bglevel +
+        ggplot2::geom_vline(
+          xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+          color = "gray",
+          linetype = "dotted",
+          size = size_default * 0.4
+        )
+      if (num_blockdays_to_output == 1) ggp_bglevel <- ggp_bglevel +
+          scale_x_continuous(
+            name = "Hour",
+            breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+          )
+      if (num_blockdays_to_output > 1) ggp_bglevel <- ggp_bglevel +
+          scale_x_continuous(
+            name = "Hour",
+            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+          )
+      
+    }
+    
+    if (xaxis_time_unit_in_seconds == 60) ggp_bglevel <- ggp_bglevel +
+      ggplot2::xlab(label = "Second")
+    
+    ggp_bglevel <- ggp_bglevel +
       ggplot2::geom_line(
         aes(
           group = period,
@@ -720,7 +756,7 @@ if (what_to_plot %in% c("figures", "both")) {
           # , linetype = treatment
           # , linetype = linetype_touse
         )
-        , size = size_default
+        , size = size_default * 0.5
         , alpha = global_alpha
       ) +
       ggplot2::geom_line(
@@ -744,134 +780,199 @@ if (what_to_plot %in% c("figures", "both")) {
           # , linetype = linetype_touse
         ),
         # linetype = "dotted",
+        size = size_default * 0.4
+      ) +
+      ggplot2::geom_hline(
+        yintercept = c(72, 99), # normal range when fasting
+        color = "gray",
         size = size_default * 0.2
       ) +
-      ggplot2::ylim(ylim_touse) +
-      ggplot2::ylab(label = "Blood Glucose") # bg_touse = bg.level
-    # ggplot2::ylab(label = "Logged Blood Glucose") # bg_touse = log_bg.level
+      ggplot2::geom_hline(
+        yintercept = 140, # normal upper bound 2 hours after eating
+        color = "gray",
+        size = size_default * 0.2,
+        linetype = "dotted"
+      ) +
+      # ggplot2::ylim(ylim_touse_bg) +
+      ggplot2::scale_y_continuous(
+        name = "Blood Glucose (mg/dL)", # bg_touse = bg.level
+        # name = "Logged Blood Glucose (log mg/dL)", # bg_touse = log_bg.level
+        limits = ylim_touse_bg,
+        breaks = seq(0, ylim_touse_bg[2], 10)
+      )
+      # ggplot2::ylab(label = "Blood Glucose (mg/dL)") # bg_touse = bg.level
+    # ggplot2::ylab(label = "Logged Blood Glucose (log mg/dL)") # bg_touse = log_bg.level
     
   }
   
-  if (values_to_plot == "differences") ggp_bglevel_spaghetti <- ggplot2::ggplot(
-    data = tbl_touse_spaghetti %>%
-      dplyr::filter(treatment == "A"), # use this for all diff_ variables,
-    aes(
-      x = spaghetti_timeidx_touse,
-      # y = diff_mean_bg_touse,
-      y = diff_median_bg_touse
-    )
-  ) +
-    ggplot2::geom_line(size = size_default) +
-    ggplot2::geom_line(
+  if (values_to_plot == "differences") {
+    
+    ggp_bglevel <- ggplot2::ggplot(
       data = tbl_touse_spaghetti %>%
-        dplyr::filter(treatment == "A"), # use this for all diff_ variables
+        dplyr::filter(treatment == "A (Sleep-Dep)"), # use this for all diff_ variables,
       aes(
-        # y = diff_sd_bg_touse,
-        y = diff_IQR_bg_touse
-      ),
-      # linetype = "dotted",
-      size = size_default * 0.2
-    ) +
-    ggplot2::ylab(label = "Difference in Blood Glucose (A-B)") # bg_touse = bg.level
-  # ggplot2::ylab(label = "Difference in Logged Blood Glucose (A-B)") # bg_touse = log_bg.level
-  
-  if (values_to_plot == "both") ggp_bglevel_spaghetti <- ggplot2::ggplot(
-    data = tbl_touse_spaghetti,
-    aes(
-      x = spaghetti_timeidx_touse,
-      y = bg_touse
-    )
-  ) +
-    ggplot2::geom_line(
-      aes(
-        group = period,
-        color = treatment
-        # , linetype = treatment
-        # , linetype = linetype_touse
-      )
-      , size = size_default
-      , alpha = global_alpha
-    ) +
-    ggplot2::geom_line(
-      aes(
-        # y = mean_bg_touse,
-        y = median_bg_touse,
-        group = treatment,
-        color = treatment
-        # , linetype = treatment
-        # , linetype = linetype_touse
-      ),
-      size = size_default * 1.5
-    ) +
-    ggplot2::geom_line(
-      aes(
-        # y = sd_bg_touse,
-        y = IQR_bg_touse,
-        group = treatment,
-        color = treatment
-        # , linetype = treatment
-        # , linetype = linetype_touse
-      ),
-      # linetype = "dotted",
-      size = size_default * 0.2
-    ) +
-    ggplot2::geom_line(
-      data = tbl_touse_spaghetti %>%
-        dplyr::filter(treatment == "A"), # use this for all diff_ variables
-      aes(
+        x = spaghetti_timeidx_touse,
         # y = diff_mean_bg_touse,
         y = diff_median_bg_touse
-      ),
-      size = size_default
-    ) +
-    ggplot2::geom_line(
-      data = tbl_touse_spaghetti %>%
-        dplyr::filter(treatment == "A"), # use this for all diff_ variables
-      aes(
-        # y = diff_sd_bg_touse,
-        y = diff_IQR_bg_touse
-      ),
-      # linetype = "dotted",
-      size = size_default * 0.2
-    ) +
-    ggplot2::ylab(label = "Blood Glucose (or Difference)") # bg_touse = bg.level
-  # ggplot2::ylab(label = "Logged Blood Glucose (or Difference)") # bg_touse = log_bg.level
+      )
+    )
+    
+    if (xaxis_time_unit_in_seconds == 3600) {
+      
+      ggp_bglevel <- ggp_bglevel +
+        ggplot2::geom_vline(
+          xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+          color = "gray",
+          linetype = "dotted",
+          size = size_default * 0.4
+        )
+      if (num_blockdays_to_output == 1) ggp_bglevel <- ggp_bglevel +
+          scale_x_continuous(
+            name = "Hour",
+            breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+          )
+      if (num_blockdays_to_output > 1) ggp_bglevel <- ggp_bglevel +
+          scale_x_continuous(
+            name = "Hour",
+            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+          )
+      
+    }
+    
+    if (xaxis_time_unit_in_seconds == 60) ggp_bglevel <- ggp_bglevel +
+        ggplot2::xlab(label = "Second")
+    
+    ggp_bglevel <- ggp_bglevel +
+      ggplot2::geom_line(size = size_default * 1.5) +
+      ggplot2::geom_line(
+        data = tbl_touse_spaghetti %>%
+          dplyr::filter(treatment == "A (Sleep-Dep)"), # use this for all diff_ variables
+        aes(
+          # y = diff_sd_bg_touse,
+          y = diff_IQR_bg_touse
+        ),
+        # linetype = "dotted",
+        size = size_default * 0.2
+      ) +
+      ggplot2::ylab(label = "Difference (A-B) in Blood Glucose (mg/dL)") # bg_touse = bg.level
+    # ggplot2::ylab(label = "Difference in Logged Blood Glucose (A-B)") # bg_touse = log_bg.level
+    
+  }
   
-  ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
+  if (values_to_plot == "both") {
+    
+    ggp_bglevel <- ggplot2::ggplot(
+      data = tbl_touse_spaghetti,
+      aes(
+        x = spaghetti_timeidx_touse,
+        y = bg_touse
+      )
+    )
+    
+    if (xaxis_time_unit_in_seconds == 3600) {
+      
+      ggp_bglevel <- ggp_bglevel +
+        ggplot2::geom_vline(
+          xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+          color = "gray",
+          linetype = "dotted",
+          size = size_default * 0.4
+        )
+      if (num_blockdays_to_output == 1) ggp_bglevel <- ggp_bglevel +
+          scale_x_continuous(
+            name = "Hour",
+            breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+          )
+      if (num_blockdays_to_output > 1) ggp_bglevel <- ggp_bglevel +
+          scale_x_continuous(
+            name = "Hour",
+            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+          )
+      
+    }
+    
+    if (xaxis_time_unit_in_seconds == 60) ggp_bglevel <- ggp_bglevel +
+        ggplot2::xlab(label = "Second")
+    
+    ggp_bglevel <- ggp_bglevel +
+      ggplot2::geom_line(
+        aes(
+          group = period,
+          color = treatment
+          # , linetype = treatment
+          # , linetype = linetype_touse
+        )
+        , size = size_default * 0.5
+        , alpha = global_alpha
+      ) +
+      ggplot2::geom_line(
+        aes(
+          # y = mean_bg_touse,
+          y = median_bg_touse,
+          group = treatment,
+          color = treatment
+          # , linetype = treatment
+          # , linetype = linetype_touse
+        ),
+        size = size_default * 1.5
+      ) +
+      ggplot2::geom_line(
+        aes(
+          # y = sd_bg_touse,
+          y = IQR_bg_touse,
+          group = treatment,
+          color = treatment
+          # , linetype = treatment
+          # , linetype = linetype_touse
+        ),
+        # linetype = "dotted",
+        size = size_default * 0.4
+      ) +
+      ggplot2::geom_line(
+        data = tbl_touse_spaghetti %>%
+          dplyr::filter(treatment == "A (Sleep-Dep)"), # use this for all diff_ variables
+        aes(
+          # y = diff_mean_bg_touse,
+          y = diff_median_bg_touse
+        ),
+        size = size_default * 1.5
+      ) +
+      ggplot2::geom_line(
+        data = tbl_touse_spaghetti %>%
+          dplyr::filter(treatment == "A (Sleep-Dep)"), # use this for all diff_ variables
+        aes(
+          # y = diff_sd_bg_touse,
+          y = diff_IQR_bg_touse
+        ),
+        # linetype = "dotted",
+        size = size_default * 0.3
+      ) +
+      ggplot2::geom_hline(
+        yintercept = c(72, 99), # normal range when fasting
+        color = "gray",
+        size = size_default * 0.2
+      ) +
+      ggplot2::geom_hline(
+        yintercept = 140, # normal upper bound 2 hours after eating
+        color = "gray",
+        size = size_default * 0.2,
+        linetype = "dotted"
+      ) +
+      ggplot2::ylab(label = "Blood Glucose (or Difference)") # bg_touse = bg.level
+    # ggplot2::ylab(label = "Logged Blood Glucose (or Difference)") # bg_touse = log_bg.level
+    
+  }
+  
+  ggp_bglevel <- ggp_bglevel +
     ggplot2::theme_classic() +
     ggplot2::geom_hline(
       yintercept = 0,
-      color = "gray",
-      size = size_default * 0.4
+      # color = "gray",
+      size = size_default * 0.3
     ) +
     scale_color_discrete(name = "Treatment") # http://www.cookbook-r.com/Graphs/Legends_(ggplot2)/
-  
-  # if (num_blockdays_to_output == 1) {
-  
-  if (xaxis_time_unit_in_seconds == 3600) ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
-    # ggplot2::xlab(label = "period Hour") +
-    scale_x_continuous(
-      name = "Hour",
-      breaks = c(0, seq(from = 4, to = (24 * num_blockdays_to_output), by = 4))
-    )
-  if (xaxis_time_unit_in_seconds == 60) ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
-    ggplot2::xlab(label = "Second")
-  
-  # }
-  # if (num_blockdays_to_output > 1) {
-  #   
-  #   if (xaxis_time_unit_in_seconds == 3600) ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
-  #       # ggplot2::xlab(label = "period Hour") +
-  #       scale_x_continuous(
-  #         name = "period Hour",
-  #         breaks = c(0, seq(from = 4, to = 24, by = 4))
-  #       )
-  #   if (xaxis_time_unit_in_seconds == 60) ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
-  #       ggplot2::xlab(label = "period Second")
-  #   
-  # }
-  
-  if (num_blockdays_to_output > 1) ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
+
+  if (num_blockdays_to_output > 1) ggp_bglevel <- ggp_bglevel +
     ggplot2::geom_vline(
       # xintercept = (
       #   tbl_touse %>%
@@ -886,9 +987,9 @@ if (what_to_plot %in% c("figures", "both")) {
       size = size_default * 0.6
     )
   
-  ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
+  ggp_bglevel <- ggp_bglevel +
     ggplot2::theme_classic()
-  if (pdfpng == "png") ggp_bglevel_spaghetti <- ggp_bglevel_spaghetti +
+  if (pdfpng == "png") ggp_bglevel <- ggp_bglevel +
     ggplot2::theme_classic(base_size = png_size_multiplier * 11) # default is 11; https://stackoverflow.com/questions/11955229/how-to-change-the-default-font-size-in-ggplot2
   
 }
@@ -905,7 +1006,7 @@ png(
   , height = height_touse
   , width = width_touse
 )
-ggp_bglevel_spaghetti
+ggp_bglevel
 dev.off()
 
 
@@ -922,12 +1023,27 @@ dev.off()
 ## Table.
 if (what_to_plot %in% c("tables", "both")) {
   
+  tbl_craving <- tbl_touse %>%
+    dplyr::filter(
+      !is.na(craving_touse),
+      # period_day <= num_blockdays_to_output
+      period_day %in% c(3)
+    ) %>%
+    dplyr::select(
+      period_day,
+      treatment,
+      craving_touse
+    )
+  table(
+    tbl_craving$craving_touse,
+    tbl_craving$treatment
+  )
+  fisher.test(
+    tbl_craving$craving_touse,
+    tbl_craving$treatment
+  )
   if(num_blockdays_to_output == 1) readr::write_excel_csv(
-    x = tbl_touse %>%
-      dplyr::filter(
-        !is.na(craving_touse),
-        period_day <= num_blockdays_to_output
-      ) %>%
+    x = tbl_craving %>%
       dplyr::group_by(
         period_day,
         treatment,
@@ -936,8 +1052,8 @@ if (what_to_plot %in% c("tables", "both")) {
       dplyr::summarize(n()) %>%
       dplyr::mutate(
         fisher_test_pvalue = fisher.test(
-          tbl_touse$treatment,
-          tbl_touse$craving_touse
+          tbl_craving$treatment,
+          tbl_craving$craving_touse
         )$p.value
       ),
     path = paste0(
@@ -978,7 +1094,7 @@ if (what_to_plot %in% c("tables", "both")) {
 ## Spaghetti plot.
 if (what_to_plot %in% c("figures", "both")) {
   
-  ylim_touse <- c(0, 50)
+  ylim_touse_panas <- c(0, 50)
   
   # Make plot table.
   tbl_touse_forplot_panas <- tbl_touse %>%
@@ -997,7 +1113,34 @@ if (what_to_plot %in% c("figures", "both")) {
       x = spaghetti_timeidx_touse,
       y = posaff_touse
     )
-  ) +
+  )
+
+  if (xaxis_time_unit_in_seconds == 3600) {
+    
+    ggp_panas <- ggp_panas +
+      ggplot2::geom_vline(
+        xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+        color = "gray",
+        linetype = "dotted",
+        size = size_default * 0.4
+      )
+    if (num_blockdays_to_output == 1) ggp_panas <- ggp_panas +
+        scale_x_continuous(
+          name = "Hour",
+          breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+        )
+    if (num_blockdays_to_output > 1) ggp_panas <- ggp_panas +
+        scale_x_continuous(
+          name = "Hour",
+          breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+        )
+    
+  }
+  
+  if (xaxis_time_unit_in_seconds == 60) ggp_panas <- ggp_panas +
+    ggplot2::xlab(label = "Second")
+  
+  ggp_panas <- ggp_panas +
     ggplot2::theme_classic() +
     ggplot2::geom_line(
       aes(
@@ -1035,18 +1178,14 @@ if (what_to_plot %in% c("figures", "both")) {
       , size = size_default * 4
       , alpha = global_alpha_panas
     ) +
-    ggplot2::ylim(ylim_touse) +
+    ggplot2::ylim(ylim_touse_panas) +
+    ggplot2::geom_hline(
+      yintercept = 0,
+      # color = "gray",
+      size = size_default * 0.3
+    ) +
     scale_color_discrete(name = "Treatment") + # http://www.cookbook-r.com/Graphs/Legends_(ggplot2)/
     ggplot2::ylab(label = "Positive and Negative Affect Scale")
-  
-  if (xaxis_time_unit_in_seconds == 3600) ggp_panas <- ggp_panas +
-    # ggplot2::xlab(label = "period Hour") +
-    scale_x_continuous(
-      name = "Hour",
-      breaks = c(0, seq(from = 4, to = (24 * num_blockdays_to_output), by = 4))
-    )
-  if (xaxis_time_unit_in_seconds == 60) ggp_panas <- ggp_panas +
-    ggplot2::xlab(label = "Second")
   
   if (num_blockdays_to_output > 1) ggp_panas <- ggp_panas +
     ggplot2::geom_vline(
