@@ -1026,22 +1026,22 @@ if (what_to_plot %in% c("tables", "both")) {
   tbl_craving <- tbl_touse %>%
     dplyr::filter(
       !is.na(craving_touse),
-      # period_day <= num_blockdays_to_output
-      period_day %in% c(3)
+      period_day <= num_blockdays_to_output
+      # period_day %in% c(3)
     ) %>%
     dplyr::select(
       period_day,
       treatment,
       craving_touse
     )
-  table(
-    tbl_craving$craving_touse,
-    tbl_craving$treatment
-  )
-  fisher.test(
-    tbl_craving$craving_touse,
-    tbl_craving$treatment
-  )
+  # table(
+  #   tbl_craving$craving_touse,
+  #   tbl_craving$treatment
+  # )
+  # fisher.test(
+  #   tbl_craving$craving_touse,
+  #   tbl_craving$treatment
+  # )
   if(num_blockdays_to_output == 1) readr::write_excel_csv(
     x = tbl_craving %>%
       dplyr::group_by(
