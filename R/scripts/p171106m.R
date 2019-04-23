@@ -191,7 +191,8 @@ colnames(df_cgm_wac) <- c(
 )
 df_cgm_wac$unknown <- NULL
 df_cgm_wac$datetime <- as.POSIXct((df_cgm_wac$datetime)*86400, tz="GMT", origin="1904-01-01")
-df_cgm_wac$timediff.minutes <- (c(NA, diff(df_cgm_wac$datetime)))/60
+df_cgm_wac$datetime <- df_cgm_wac$datetime - 3600 * 6 # subract 6 hours to start 24-hour day at 06:00
+# df_cgm_wac$timediff.minutes <- (c(NA, diff(df_cgm_wac$datetime)))/60
 
 
 ## Participant: Eric J. Daza.
@@ -215,7 +216,10 @@ df_cgm_wac$timediff.minutes <- (c(NA, diff(df_cgm_wac$datetime)))/60
 tbl_wac <- dplyr::as_tibble(df_cgm_wac) %>%
   dplyr::full_join(
     dplyr::as_tibble(df_qualtrics_wac) %>%
-      dplyr::rename(datetime = Recorded.Date),
+      # dplyr::rename(datetime = Recorded.Date),
+      dplyr::rename(datetime = Recorded.Date) %>%
+      dplyr::mutate(datetime = datetime - 3600 * 6) # subract 6 hours to start 24-hour day at 06:00
+    ,
     by = "datetime"
   ) %>%
   dplyr::arrange(datetime) %>%
@@ -728,19 +732,21 @@ if (what_to_plot %in% c("figures", "both")) {
       ggp_bglevel <- ggp_bglevel +
         ggplot2::geom_vline(
           xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
-          color = "gray",
+          # color = "gray",
           linetype = "dotted",
-          size = size_default * 0.4
+          size = size_default * 0.1
         )
       if (num_blockdays_to_output == 1) ggp_bglevel <- ggp_bglevel +
           scale_x_continuous(
             name = "Hour",
-            breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+            breaks = c(0, seq(from = 2, to = 24, by = 2)),
+            labels = c(6, seq(from = 8, to = (24 + 6), by = 2)) %% 24
           )
       if (num_blockdays_to_output > 1) ggp_bglevel <- ggp_bglevel +
           scale_x_continuous(
             name = "Hour",
-            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+            labels = c(6, seq(from = 12, to = (24 * num_blockdays_to_output + 6), by = 6)) %% 24
           )
       
     }
@@ -822,19 +828,21 @@ if (what_to_plot %in% c("figures", "both")) {
       ggp_bglevel <- ggp_bglevel +
         ggplot2::geom_vline(
           xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
-          color = "gray",
+          # color = "gray",
           linetype = "dotted",
-          size = size_default * 0.4
+          size = size_default * 0.1
         )
       if (num_blockdays_to_output == 1) ggp_bglevel <- ggp_bglevel +
           scale_x_continuous(
             name = "Hour",
-            breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+            breaks = c(0, seq(from = 2, to = 24, by = 2)),
+            labels = c(6, seq(from = 8, to = (24 + 6), by = 2)) %% 24
           )
       if (num_blockdays_to_output > 1) ggp_bglevel <- ggp_bglevel +
           scale_x_continuous(
             name = "Hour",
-            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+            labels = c(6, seq(from = 12, to = (24 * num_blockdays_to_output + 6), by = 6)) %% 24
           )
       
     }
@@ -874,19 +882,21 @@ if (what_to_plot %in% c("figures", "both")) {
       ggp_bglevel <- ggp_bglevel +
         ggplot2::geom_vline(
           xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
-          color = "gray",
+          # color = "gray",
           linetype = "dotted",
-          size = size_default * 0.4
+          size = size_default * 0.1
         )
       if (num_blockdays_to_output == 1) ggp_bglevel <- ggp_bglevel +
           scale_x_continuous(
             name = "Hour",
-            breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+            breaks = c(0, seq(from = 2, to = 24, by = 2)),
+            labels = c(6, seq(from = 8, to = (24 + 6), by = 2)) %% 24
           )
       if (num_blockdays_to_output > 1) ggp_bglevel <- ggp_bglevel +
           scale_x_continuous(
             name = "Hour",
-            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+            breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+            labels = c(6, seq(from = 12, to = (24 * num_blockdays_to_output + 6), by = 6)) %% 24
           )
       
     }
@@ -983,8 +993,8 @@ if (what_to_plot %in% c("figures", "both")) {
       #     dplyr::select(timeidx_touse)
       # )$timeidx_touse,
       xintercept = c(0, seq(from = 24, to = (24 * num_blockdays_to_output), by = 24)),
-      color = "gray",
-      size = size_default * 0.6
+      # color = "gray",
+      size = size_default * 0.5
     )
   
   ggp_bglevel <- ggp_bglevel +
@@ -1120,19 +1130,21 @@ if (what_to_plot %in% c("figures", "both")) {
     ggp_panas <- ggp_panas +
       ggplot2::geom_vline(
         xintercept = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
-        color = "gray",
+        # color = "gray",
         linetype = "dotted",
-        size = size_default * 0.4
+        size = size_default * 0.1
       )
     if (num_blockdays_to_output == 1) ggp_panas <- ggp_panas +
         scale_x_continuous(
           name = "Hour",
-          breaks = c(0, seq(from = 2, to = (24 * num_blockdays_to_output), by = 2))
+          breaks = c(0, seq(from = 2, to = 24, by = 2)),
+          labels = c(6, seq(from = 8, to = (24 + 6), by = 2)) %% 24
         )
     if (num_blockdays_to_output > 1) ggp_panas <- ggp_panas +
         scale_x_continuous(
           name = "Hour",
-          breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6))
+          breaks = c(0, seq(from = 6, to = (24 * num_blockdays_to_output), by = 6)),
+          labels = c(6, seq(from = 12, to = (24 * num_blockdays_to_output + 6), by = 6)) %% 24
         )
     
   }
@@ -1198,8 +1210,8 @@ if (what_to_plot %in% c("figures", "both")) {
       #     dplyr::select(timeidx_touse)
       # )$timeidx_touse,
       xintercept = c(0, seq(from = 24, to = (24 * num_blockdays_to_output), by = 24)),
-      color = "gray",
-      size = size_default * 0.6
+      # color = "gray",
+      size = size_default * 0.5
     )
   
   ggp_panas <- ggp_panas +
